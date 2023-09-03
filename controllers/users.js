@@ -3,23 +3,23 @@ const User = require('../models/user');
 module.exports.getUsers = (req, res) => {
   User.find({})
     .then((users) => res.send(users))
-    .catch(() => res.status(400).send('На сервере произошла ошибка'));
+    .catch(() => res.status(500).send({ message: 'На сервере произошла ошибка' }));
 };
 
 module.exports.getUserbyId = (req, res) => {
-//  if (req.params.userId.length === 24) {
-  User.findById(req.params.userId)
-    .then((user) => {
-      if (!user) {
-        res.status(404).send({ message: 'Похоже  пользователя с таким _id нету' });
-        return;
-      }
-      res.send(user);
-    })
-    .catch(() => res.status(404).send({ message: 'Похоже  пользователя с таким _id нету' }));
-  // } else {
-//    res.status(400).send({ message: 'Некорректный _id' });
-//  }
+  if (req.params.userId.length === 24) {
+    User.findById(req.params.userId)
+      .then((user) => {
+        if (!user) {
+          res.status(404).send({ message: 'Похоже  пользователя с таким _id нету' });
+          return;
+        }
+        res.send(user);
+      })
+      .catch(() => res.status(404).send({ message: 'Похоже  пользователя с таким _id нету' }));
+  } else {
+    res.status(400).send({ message: 'Некорректный _id' });
+  }
 };
 
 module.exports.createUser = (req, res) => {
