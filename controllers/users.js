@@ -1,8 +1,12 @@
+const { SECRET_KEY = 'some-secret-key' } = process.env;
 const { default: mongoose } = require('mongoose');
 const { HTTP_STATUS_OK, HTTP_STATUS_CREATED } = require('http2').constants;
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const User = require('../models/user');
 const BadRequestError = require('../errors/BadRequestError');
 const NotFoundError = require('../errors/NotFoundError');
+const ConflictError = require('../errors/ConflictError');
 
 module.exports.getUsers = (req, res, next) => {
   User.find({})
@@ -28,11 +32,20 @@ module.exports.getUserbyId = (req, res, next) => {
 };
 
 module.exports.createUser = (req, res, next) => {
-  const { name, about, avatar } = req.body;
-  User.create({ name, about, avatar })
-    .then((user) => res.status(HTTP_STATUS_CREATED).send(user))
+  const {
+    name, about, avatar, email, password,
+  } = req.body;
+  bcrypt.hash(password, 10)
+    .then((hash) => User.create({
+      name, about, avatar, email, password: hash,
+    }))
+    .then((user) => res.status(HTTP_STATUS_CREATED).send({
+      _id: user._id, name: user.name, about: user.about, avatar: user.avatar, email: user.email,
+    }))
     .catch((err) => {
-      if (err instanceof mongoose.Error.ValidationError) {
+      if (err.code === 11000) {
+        next(new ConflictError(`Пользователь с таким email: ${email}  уже зарегистрирован`));
+      } else if (err instanceof mongoose.Error.ValidationError) {
         next(new BadRequestError(err.message));
       } else {
         next(err);
@@ -69,4 +82,22 @@ module.exports.editAvatar = (req, res, next) => {
         next(err);
       }
     });
+};
+
+module.exports.login = (req, res, next) => {
+  const { email, password } = req.body;
+  return User.findUserByCredentials(email, password)
+    .then((user) => {
+      const token = jwt.sign({ _id: user._id }, SECRET_KEY, { expiresIn: '7d' });
+      res.send({ token });
+    })
+    .catch((err) => {
+      next(err);
+    });
+};
+
+module.exports.getMeUser = (req, res, next) => {
+  User.findById(req.user._id)
+    .then((user) => res.status(HTTP_STATUS_OK).send(user))
+    .catch(next);
 };
