@@ -1,6 +1,8 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
+const cors = require('cors');
 const { celebrate, Joi } = require('celebrate');
 const { errors } = require('celebrate');
 const helmet = require('helmet');
@@ -10,15 +12,19 @@ const { createUser } = require('./controllers/users');
 const auth = require('./middlewares/auth');
 const urlRegex = require('./utils/constants');
 const errorHandler = require('./middlewares/errorHandler');
+const { requestLogger, errorLogger } = require('./middlewares/logger');
 
 const { PORT = 3000, DB_URL = 'mongodb://127.0.0.1:27017/mestodb' } = process.env;
-
+// console.log(process.env);
 const app = express();
+
+app.use(cors());
+
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // за 15 минут
   max: 100, // 100 запросов с 1 ip
 });
-app.use(limiter);
+
 app.use(helmet());
 
 app.use(bodyParser.json());
@@ -48,12 +54,25 @@ app.post('/signup', celebrate({
 
 app.use(auth);
 
+app.use(requestLogger);
+
+app.use(limiter);
+
 app.use('/users', require('./routes/users'));
 app.use('/cards', require('./routes/cards'));
 
 app.use('/', require('./routes/index'));
 
+app.use(errorLogger);
+
 app.use(errors());
 app.use(errorHandler);
 
 app.listen(PORT);
+
+/*
+# Logs
+logs
+*.log
+npm-debug.log*
+*/
